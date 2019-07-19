@@ -13,7 +13,6 @@ import * as glob from 'glob';
  
 import { StorageSimulatorServerConfig} from '../index';
 
-const directoryPath = join(__dirname, 'bucket'); // get bucket througb parameters remove afterwards
 //console.log(directoryPath);
 
 export class StorageServer {
@@ -28,7 +27,7 @@ export class StorageServer {
     private config: StorageSimulatorServerConfig,
   ) {
     this.localDirectoryPath = config.localDirS3;
-    console.log("path file",this.localDirectoryPath);
+    //console.log("path file",this.localDirectoryPath);
     this.app = express();
 
     this.app.use(express.json());
@@ -41,8 +40,8 @@ export class StorageServer {
 
     this.server = null;
     this.route = config.route;
-    console.log("config object = ", config);
-    console.log("route path = ", this.route +':path');
+    //console.log("config object = ", config);
+    //console.log("route path = ", this.route +':path');
 
     //this.app.get(this.route +':path', this.handleRequestGet.bind(this));
     //this.app.put(this.route +':path', this.handleRequestPut.bind(this));
@@ -63,7 +62,7 @@ export class StorageServer {
     return e2p(this.server, 'listening').then(() => {
       this.connection = this.server.address();
       this.url = `http://${getLocalIpAddress()}:${this.connection.port}`;
-      console.log('given url : ' ,this.url);
+      //console.log('given url : ' ,this.url);
       return this.server;
     })
   }
@@ -116,7 +115,7 @@ export class StorageServer {
     // getting folders recursively
     
     let files =glob.sync(this.localDirectoryPath + '/**/*');
-      console.log("files",files);
+      //console.log("files",files);
       for(let file in files){
         if(!statSync(files[file]).isDirectory()){
           console.log('files in dir',files[file].split(this.localDirectoryPath)[1]);
@@ -140,14 +139,14 @@ export class StorageServer {
     // fill in  this content
     console.log("put enetered");
     const directoryPath =  join(String(this.localDirectoryPath),String(request.params.path)); 
-    console.log(request.headers);
-    console.log(Object.keys(request.body)[0]);
+    //console.log(request.headers);
+    //console.log(Object.keys(request.body)[0]);
     ensureFileSync(directoryPath);
     writeFile(directoryPath,request.body, function(err) {
       if(err) {
           return console.log(err);
       }
-      console.log("The file was saved!");
+      //console.log("The file was saved!");
     });
     response.send(xml(convert.json2xml(JSON.stringify('upload success'))));
   }

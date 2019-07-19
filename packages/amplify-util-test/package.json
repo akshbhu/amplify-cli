@@ -4,13 +4,13 @@
   "description": "amplify cli plugin providing local testing ",
   "main": "lib/index.js",
   "scripts": {
-    "test": "jest",
-    "test-ci": "jest --ci -i",
+    "test": "jest src/__tests__/*.e2e.test.ts",
+    "e2e": "jest src/__e2e__/*.e2e.test.ts",
+    "test-ci": "jest --ci -i src/__tests__/*.e2e.test.ts",
     "test-watch": "jest --watch",
     "build": "tsc",
     "watch": "tsc -w",
     "clean": "rm -rf ./lib",
-    "lint": "tslint -p ./tslint.json",
     "format": "prettier --write ./src/**/*.ts ./__tests__/**/*.ts"
   },
   "author": "Amazon Web Services",
@@ -19,11 +19,12 @@
     "@conduitvc/dynamodb-emulator": "^0.5.3",
     "@hapi/topo": "^3.1.0",
     "amplify-storage-simulator": "0.0.1",
+    "amplify-appsync-simulator": "0.0.1",
     "amplify-provider-awscloudformation": "^1.10.0",
     "chokidar": "^3.0.0",
     "fs-extra": "^7.0.1",
     "lodash": "^4.17.11",
-    "amplify-codegen": "1.5.0"
+    "amplify-codegen": "1.5.6"
   },
   "devDependencies": {
     "@types/jest": "23.1.1",
@@ -33,7 +34,21 @@
     "prettier": "^1.14.2",
     "ts-jest": "^22.4.6",
     "tslint": "^5.10.0",
-    "typescript": "^2.8.3"
+    "typescript": "^2.8.3",
+    "graphql-transformer-common": "3.8.2",
+    "graphql-mapping-template": "3.1.1",
+    "graphql-transformer-core": "3.7.4",
+    "graphql-auth-transformer": "3.7.4",
+    "graphql-connection-transformer": "3.5.4",
+    "graphql-dynamodb-transformer": "3.8.4",
+    "graphql-elasticsearch-transformer": "3.6.5",
+    "graphql-function-transformer": "1.1.4",
+    "graphql-key-transformer": "1.1.6",
+    "graphql-versioned-transformer": "3.4.11",
+    "axios": "^0.19.0",
+    "aws-amplify": "1.1.4",
+    "aws-sdk": "^2.259.1",
+    "node-fetch": "^2.6.0"
   },
   "jest": {
     "transform": {
@@ -46,7 +61,7 @@
       "!src/__tests__/**"
     ],
     "testURL": "http://localhost/",
-    "testRegex": "(src/__tests__/.*.test.*)$",
+    "testRegex": "(src/(__tests__|__e2e__)/.*.test.*)$",
     "moduleFileExtensions": [
       "ts",
       "tsx",

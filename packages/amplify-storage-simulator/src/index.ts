@@ -19,7 +19,7 @@ export class AmplifyStorageSimulator {
 
 
   constructor(serverConfig: StorageSimulatorServerConfig) {
-    console.log("config",serverConfig);
+    //console.log("config",serverConfig);
     this._serverConfig = serverConfig;
 
     try {
