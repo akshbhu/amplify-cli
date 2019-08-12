@@ -21,6 +21,8 @@ import * as etag from "etag";
 
 import { StorageSimulatorServerConfig } from "../index";
 
+import * as util from './utils';
+
 const LIST_CONTENT = "Contents";
 const LIST_COMMOM_PREFIXES = "CommonPrefixes";
 
@@ -39,7 +41,8 @@ export class StorageServer {
   private connection;
   private route; // bucket name get from the CFN parser
   url: string;
-  private uploadId;
+  private uploadId = [];
+  private upload_bufferMap; // object to store parts of a big file
   private localDirectoryPath: string;
 
   constructor(private config: StorageSimulatorServerConfig) {
@@ -59,6 +62,7 @@ export class StorageServer {
 
     this.server = null;
     this.route = config.route;
+    this.upload_bufferMap = new Object();
   }
 
   start() {
@@ -80,31 +84,14 @@ export class StorageServer {
       this.server.close();
       this.server = null;
       this.connection = null;
+      this.uploadId = null;
+      this.upload_bufferMap =  null;
     }
   }
 
   private async handleRequestAll(request, response) {
     // parsing the path and the request parameters
-    request.url = decodeURIComponent(request.url);
-    const temp = request.url.split(this.route);
-    request.params.path = "";
-
-    // getting the path of the image from the url and storing in the request.params.path  with the prefix
-    if (request.query.prefix !== undefined)
-      request.params.path = request.query.prefix + "/";
-
-    if (temp[1] !== undefined)
-      request.params.path = normalize(
-        join(request.params.path, temp[1].split("?")[0])
-      ); // change for IOS as no bucket name is present in the original url
-    else
-      request.params.path = normalize(
-        join(request.params.path, temp[0].split("?")[0])
-      );
-
-    if (request.params.path[0] == '/') {
-      request.params.path = request.params.path.substring(1);
-    }
+    util.parseUrl(request, this.route);
 
     if (request.method === "PUT") {
       this.handleRequestPut(request, response);
@@ -114,13 +101,14 @@ export class StorageServer {
       this.handleRequestPost(request, response);
     }
 
-    if (request.method === "GET") {
-      if (request.params.path.indexOf(".") === -1) {
-        this.handleRequestList(request, response);
-      } else {
-        this.handleRequestGet(request, response);
-      }
+    if (request.method === 'GET') {
+      this.handleRequestGet(request, response);
     }
+
+    if (request.method === 'LIST') {
+      this.handleRequestList(request, response);
+    }
+
     if (request.method === "DELETE") {
       this.handleRequestDelete(request, response);
     }
@@ -180,7 +168,7 @@ export class StorageServer {
     //console.log("dirPath", dirPath);
     let files = glob.sync(dirPath + "/**/*");
     for (let file in files) {
-      if (delimiter !== "" && checkfile(file, prefix, delimiter)) {
+      if (delimiter !== "" && util.checkfile(file, prefix, delimiter)) {
         ListBucketResult[LIST_COMMOM_PREFIXES].push({
           prefix: request.params.path + files[file].split(dirPath)[1]
         });
@@ -205,7 +193,7 @@ export class StorageServer {
     ListBucketResult["Prefix"] = request.query.prefix || "";
     ListBucketResult["KeyCount"] = keyCount;
     ListBucketResult["MaxKeys"] = maxKeys;
-    ListBucketResult["Delimiter"] = delimiter;
+    ListBucketResult["Delimiter"] = delimiter; 
     if (keyCount === maxKeys) {
       ListBucketResult["IsTruncated"] = true;
     } else {
@@ -244,8 +232,14 @@ export class StorageServer {
     );
     ensureFileSync(directoryPath);
     // strip signature in android , returns same buffer for other clients
-    var new_data = stripChunkSignature(request.body);
-    writeFileSync(directoryPath, new_data);
+    var new_data = util.stripChunkSignature(request.body);
+    // loading data in map for each part
+    if (request.query.partNumber !== undefined) {
+      this.upload_bufferMap[request.query.uploadId][request.query.partNumber] = request.body;
+    }
+    else {
+      writeFileSync(directoryPath, new_data);
+    }
     response.send(xml(convert.json2xml(JSON.stringify("upload success"))));
   }
 
@@ -254,7 +248,9 @@ export class StorageServer {
       join(String(this.localDirectoryPath), String(request.params.path))
     );
     if (request.query.uploads !== undefined) {
-      this.uploadId = uuid();
+      let id = uuid();
+      this.uploadId.push(id);
+      this.upload_bufferMap[id] = new Object();
       //response.set('Content-Type', 'text/xml');
       response.send(
         o2x({
@@ -262,11 +258,18 @@ export class StorageServer {
           InitiateMultipartUploadResult: {
             Bucket: this.route,
             Key: request.params.path,
-            UploadId: this.uploadId
+            UploadId: id
           }
         })
       );
-    } else if (request.query.uploadId === this.uploadId) {
+    } else if (this.uploadId.includes(request.query.uploadId)) {
+      let arr = [];
+      arr = Object.values(this.upload_bufferMap[request.query.uploadId]); // store all the buffers  in an array
+      delete (this.upload_bufferMap[request.query.uploadId]); // clear the map with current requestID
+      // remove the current upload ID
+
+      this.uploadId.splice(this.uploadId.indexOf(request.query.uploadId), 1);
+
       response.set("Content-Type", "text/xml");
       response.send(
         o2x({
@@ -279,12 +282,14 @@ export class StorageServer {
           }
         })
       );
+      let buf = Buffer.concat(arr);
+      writeFileSync(directoryPath, buf);
     } else {
       const directoryPath = normalize(
         join(String(this.localDirectoryPath), String(request.params.path))
       );
       ensureFileSync(directoryPath);
-      var new_data = stripChunkSignature(request.body);
+      var new_data = util.stripChunkSignature(request.body);
       writeFileSync(directoryPath, new_data);
       response.send(
         o2x({
@@ -297,54 +302,6 @@ export class StorageServer {
           }
         })
       );
-    }
-  }
-}
-
-// removing chunk siognature from request payload if present
-function stripChunkSignature(buf: Buffer) {
-  let str = buf.toString();
-  var regex = /^[A-Fa-f0-9]+;chunk-signature=[0-9a-f]{64}/gm;
-  let m;
-  let offset = [];
-  let chunk_size = [];
-  let arr = [];
-  while ((m = regex.exec(str)) !== null) {
-    // This is necessary to avoid infinite loops with zero-width matches
-    if (m.index === regex.lastIndex) {
-      regex.lastIndex++;
-    }
-    m.forEach((match, groupIndex, index) => {
-      offset.push(Buffer.from(match).byteLength);
-      var temp = match.split(";")[0];
-      chunk_size.push(parseInt(temp, 16));
-    });
-  }
-  var start = 0;
-  //if no chunk signature is present
-  if (offset.length === 0) {
-    return buf;
-  }
-  for (let i = 0; i < offset.length - 1; i++) {
-    //console.log("i = ", i);
-    start = start + offset[i] + 2;
-    //console.log("start= ", start);
-    arr.push(buf.slice(start, start + chunk_size[i]));
-    start = start + chunk_size[i] + 2;
-  }
-  return Buffer.concat(arr);
-}
-
-// check for the delimiter in the file for list object request
-function checkfile(file: String, prefix: String, delimiter: String) {
-  if (delimiter === "") {
-    return true;
-  } else {
-    const temp = file.split(String(prefix))[1].split(String(delimiter));
-    if (temp[1] === undefined) {
-      return false;
-    } else {
-      return true;
     }
   }
 }
