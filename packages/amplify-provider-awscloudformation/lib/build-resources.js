@@ -19,11 +19,12 @@ async function buildResource(context, resource) {
   const backEndDir = context.amplify.pathManager.getBackendDirPath();
   const projectRoot = context.amplify.pathManager.searchProjectRootPath();
   const resourceDir = path.normalize(path.join(backEndDir, category, resourceName, 'src'));
-  const lastUpdateTime = fs.readdirSync(resourceDir)
+  const lastUpdateTime = fs
+    .readdirSync(resourceDir)
     .map(file => path.join(resourceDir, file))
     .map(file => fs.statSync(file))
     .map(stats => stats.mtime)
-    .reduce((acc, it) => it > acc ? it : acc, 0); // reduce to the latest time
+    .reduce((acc, it) => (it > acc ? it : acc), 0); // reduce to the latest time
   const distDir = path.normalize(path.join(backEndDir, category, resourceName, 'dist'));
 
   let zipFilename = resource.distZipFilename;

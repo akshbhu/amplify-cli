@@ -1,6 +1,6 @@
-import {FunctionRuntimeContributorFactory} from 'amplify-function-plugin-interface'
+import { FunctionRuntimeContributorFactory } from 'amplify-function-plugin-interface';
 export const functionRuntimeContributorFactory: FunctionRuntimeContributorFactory = context => {
-  context.amplify
+  context.amplify;
   return {
     contribute: selection => {
       if (selection !== 'nodejs') {
@@ -11,9 +11,9 @@ export const functionRuntimeContributorFactory: FunctionRuntimeContributorFactor
           name: 'NodeJS',
           value: 'nodejs',
           cloudTemplateValue: 'nodejs12.x',
-          defaultHandler: 'index.handler'
-        }
-      })
+          defaultHandler: 'index.handler',
+        },
+      });
     },
     package: params => {
       throw new Error('not yet implemented');
@@ -23,6 +23,6 @@ export const functionRuntimeContributorFactory: FunctionRuntimeContributorFactor
     },
     invoke: params => {
       throw new Error('not yet implemented');
-    }
-  }
-}
+    },
+  };
+};
