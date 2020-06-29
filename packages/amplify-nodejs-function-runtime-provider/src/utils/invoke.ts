@@ -6,12 +6,19 @@ import path from 'path';
 export function invoke(options: InvokeOptions): Promise<any> {
   return new Promise((resolve, reject) => {
     try {
+      let data: string = '';
       const lambdaFn = fork(path.join(__dirname, 'execute.js'), [], {
         execArgv: [],
         env: options.environment || {},
+        silent: true,
       });
-      lambdaFn.on('message', msg => {
-        const result = JSON.parse(msg);
+      lambdaFn.stdout.on('data', msg => {
+        data += msg;
+      });
+      lambdaFn.on('close', () => {
+        const lines = data.split('\n');
+        const lastLine = lines[lines.length - 1];
+        const result = JSON.parse(lastLine);
         if (result.error) {
           reject(result.error);
         }
