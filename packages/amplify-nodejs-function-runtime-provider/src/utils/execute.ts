@@ -80,7 +80,7 @@ export function invokeFunction(options: InvokeOptions) {
           context.done(null, null);
         }
       } else if (response !== undefined) {
-        context.done(null, await response);
+        context.done(null, null);
       }
     } catch (e) {
       context.done(e, null);
