@@ -11,6 +11,7 @@ import {
   TransformerProjectConfig,
 } from '@aws-amplify/graphql-transformer-core';
 import { ModelTransformer } from '@aws-amplify/graphql-model-transformer';
+import { KeyTransformer } from '@aws-amplify/graphql-key-transformer';
 
 import { ProviderName as providerName } from '../constants';
 import { hashDirectory } from '../upload-appsync-files';
@@ -19,7 +20,8 @@ import { loadProject as readTransformerConfiguration } from './transform-config'
 import { loadProject } from 'graphql-transformer-core';
 import { AppSyncAuthConfiguration } from '@aws-amplify/graphql-transformer-core';
 import { Template } from '@aws-amplify/graphql-transformer-core/lib/config/project-config';
-import { AmplifyCLIFeatureFlagAdapter  } from '../utils/amplify-cli-feature-flag-adapter';
+import { AmplifyCLIFeatureFlagAdapter } from '../utils/amplify-cli-feature-flag-adapter';
+//import { KeyTransformer } from 'graphql-key-transformer';
 
 const API_CATEGORY = 'api';
 const STORAGE_CATEGORY = 'storage';
@@ -32,7 +34,7 @@ const S3_SERVICE_NAME = 'S3';
 const TRANSFORM_CONFIG_FILE_NAME = `transform.conf.json`;
 
 function warnOnAuth(context, map) {
-  const a:boolean = true;
+  const a: boolean = true;
   const unAuthModelTypes = Object.keys(map).filter(type => !map[type].includes('auth') && map[type].includes('model'));
   if (unAuthModelTypes.length) {
     context.print.warning("\nThe following types do not have '@auth' enabled. Consider using @auth with @model");
@@ -45,6 +47,8 @@ function getTransformerFactory(context, resourceDir) {
   return async () => {
     const transformerList: TransformerPluginProvider[] = [
       new ModelTransformer(),
+      new KeyTransformer(),
+      // initialize here
       // TODO: initialize transformer plugins
     ];
 
@@ -241,7 +245,9 @@ export async function transformGraphQLSchema(context, options) {
   fs.ensureDirSync(buildDir);
   const project = await loadProject(resourceDir);
 
-  const lastDeployedProjectConfig = fs.existsSync(previouslyDeployedBackendDir) ? await loadProject(previouslyDeployedBackendDir): undefined;
+  const lastDeployedProjectConfig = fs.existsSync(previouslyDeployedBackendDir)
+    ? await loadProject(previouslyDeployedBackendDir)
+    : undefined;
 
   // Check for common errors
   const directiveMap = collectDirectivesByTypeNames(project.schema);

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@aws-amplify/graphql-model-transformer": "0.2.1",
+    "@aws-amplify/graphql-key-transformer": "0.1.0",
     "@aws-amplify/graphql-transformer-core": "0.2.1",
     "@aws-amplify/graphql-transformer-interfaces": "1.2.1",
     "amplify-cli-core": "1.8.0",

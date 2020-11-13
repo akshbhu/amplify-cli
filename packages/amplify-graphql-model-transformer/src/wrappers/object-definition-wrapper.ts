@@ -15,7 +15,8 @@ import {
   ListTypeNode,
   InputObjectTypeDefinitionNode,
   NamedTypeNode,
-  EnumTypeDefinitionNode} from 'graphql';
+  EnumTypeDefinitionNode,
+} from 'graphql';
 import { DEFAULT_SCALARS } from 'graphql-transformer-common';
 
 import { merge } from 'lodash';
@@ -38,7 +39,6 @@ export class ArgumentWrapper {
   };
 }
 
-
 export class DirectiveWrapper {
   private arguments: ArgumentWrapper[] = [];
   private name: NameNode;
@@ -46,7 +46,7 @@ export class DirectiveWrapper {
   constructor(node: DirectiveNode) {
     this.name = node.name;
     this.arguments = (node.arguments || []).map(arg => new ArgumentWrapper(arg));
-    this.location = this.location;
+    this.location = node.loc;
   }
   public serialize = (): DirectiveNode => {
     return {
