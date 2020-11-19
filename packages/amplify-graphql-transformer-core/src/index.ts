@@ -34,4 +34,13 @@ export const getAppSyncServiceExtraDirectives = (): string => {
   return print(EXTRA_DIRECTIVES_DOCUMENT);
 };
 
-export { MappingTemplate } from './cdk-compat'
+export { MappingTemplate } from './cdk-compat';
+
+export {
+  InvalidDirectiveError,
+  InvalidTransformerError,
+  SchemaValidationError,
+  TransformerContractError,
+  InvalidMigrationError,
+  UnknownDirectiveError,
+} from './errors/index';
