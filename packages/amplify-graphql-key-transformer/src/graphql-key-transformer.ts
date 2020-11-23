@@ -25,8 +25,9 @@ import {
   makeConnectionField,
   wrapNonNull,
   withNamedNodeNamed,
-  ResolverResourceIDs,
 } from 'graphql-transformer-common';
+import { Aspects } from '@aws-cdk/core';
+import { DynamoDBTable, TableKeyType, AttributeDefinition, KeySchema, TableIndexProps, IndexType } from './dynamoDbTable/dynamoDbTable';
 import {
   DirectiveNode,
   ObjectTypeDefinitionNode,
@@ -195,13 +196,62 @@ export class KeyTransformer extends TransformerModelEnhancerBase implements Tran
 
   generateResolvers = (ctx: TransformerContextProvider): void => {
     for (const keyTypeName of this.typesWithKeyDirective) {
-      const keyDirectiveConfigArr = this.keyDirectiveConfig.get(keyTypeName);
-      keyDirectiveConfigArr?.forEach(keyDirectiveConfig => {
+      const def = ctx.output.getObject(keyTypeName)!;
+      const keyDirectiveConfigArr = this.keyDirectiveConfig.get(keyTypeName)!;
+      keyDirectiveConfigArr.forEach(keyDirectiveConfig => {
+        // add / update primary key and GSI
+        const tableLogicalName = `${def.name.value}Table`;
+        const stack = ctx.stackManager.getStackFor(tableLogicalName, def.name.value);
+        const keySchemaArgs = keySchema(keyDirectiveConfig);
+        const attrDefs = attributeDefinitions(keyDirectiveConfig, def, ctx);
+        const tableIndexProps = this.getIndexStructures(keyDirectiveConfig, keyTypeName);
+        Aspects.of(stack).add(new DynamoDBTable(tableIndexProps, keySchemaArgs, attrDefs));
+
+        // update resolvers
         this.updateQueryResolvers(keyDirectiveConfig, ctx, keyTypeName);
         this.updateMutationResolvers(keyDirectiveConfig, ctx, keyTypeName);
-        this.createKeyResolver(keyDirectiveConfig, ctx, keyTypeName);
+        //this.createKeyResolver(keyDirectiveConfig, ctx, keyTypeName);
       });
     }
+  };
+
+  /**
+   * Update the existing @model table's index structures. Includes primary key, GSI, and LSIs.
+   * @param definition The object type definition node.
+   * @param directive The @key directive
+   * @param ctx The transformer context
+   */
+
+  getIndexStructures = (keyDirectiveArgs: KeyDirectiveConfiguration, keyTypeName: string): TableKeyType => {
+    if (this.isPrimaryKey(keyDirectiveArgs)) {
+      // Set the table's primary key using the @key definition.
+      return { isPrimary: true };
+    } else {
+      // Return a GSI/LSI Config.
+      return this.appendSecondaryIndex(keyDirectiveArgs, keyTypeName);
+    }
+  };
+
+  /**
+   * Add a LSI or GSI to the table as defined by a @key.
+   * @param definition The object type definition node.
+   * @param directive The @key directive
+   * @param ctx The transformer context
+   */
+  appendSecondaryIndex = (keyDirectiveArgs: KeyDirectiveConfiguration, keyTypeName: string): TableKeyType => {
+    const ks = keySchema(keyDirectiveArgs);
+    const primaryKeyDirective = this.keyDirectiveConfig.get(keyTypeName)!.find(element => this.isPrimaryKey(element));
+    const primaryPartitionKeyName: string = primaryKeyDirective ? primaryKeyDirective.fields[0] : 'id';
+    const baseIndexProperties: TableKeyType = {
+      isPrimary: false,
+      index: { indexProps: { indexName: keyDirectiveArgs.name! }, indexType: IndexType.GSI },
+    };
+    if (primaryPartitionKeyName === ks[0].attributeName) {
+      // This is an LSI.
+      // Add the new secondary index and update the table's attribute definitions.
+      baseIndexProperties.index = Object.assign(baseIndexProperties.index, { indexProps: { indexType: IndexType.LSI } });
+    }
+    return baseIndexProperties;
   };
 
   generateGetResolver = (
@@ -628,7 +678,7 @@ export class KeyTransformer extends TransformerModelEnhancerBase implements Tran
   };
 }
 
-function attributeTypeFromType(type: TypeNode, ctx: TransformerValidationStepContextProvider) {
+export function attributeTypeFromType(type: TypeNode, ctx: TransformerValidationStepContextProvider) {
   const baseTypeName = getBaseType(type);
   const ofType = ctx.output.getType(baseTypeName);
   if (ofType && ofType.kind === Kind.ENUM_TYPE_DEFINITION) {
@@ -727,4 +777,58 @@ function primaryIdFields(definition: ObjectTypeDefinitionNode, keyFields: string
 
 function joinSnippets(lines: string[]): string {
   return lines.join('\n');
+}
+
+/**
+ * Return a list of attribute definitions given a @key directive arguments and an object definition.
+ * @param args The arguments passed to @key.
+ * @param def The object type definition containing the @key.
+ */
+export function attributeDefinitions(
+  args: KeyDirectiveConfiguration,
+  def: ObjectTypeDefinitionNode,
+  ctx: TransformerContextProvider,
+): AttributeDefinition[] {
+  const fieldMap = new Map();
+  for (const field of def.fields!) {
+    fieldMap.set(field.name.value, field);
+  }
+  if (args.fields.length > 2) {
+    const hashName = args.fields[0];
+    const condensedSortKey = condenseRangeKey(args.fields.slice(1));
+    return [
+      { attributeName: hashName, attributeType: attributeTypeFromType(fieldMap.get(hashName).type, ctx) },
+      { attributeName: condensedSortKey, attributeType: 'S' },
+    ];
+  } else if (args.fields.length === 2) {
+    const hashName = args.fields[0];
+    const sortName = args.fields[1];
+    return [
+      { attributeName: hashName, attributeType: attributeTypeFromType(fieldMap.get(hashName).type, ctx) },
+      { attributeName: sortName, attributeType: attributeTypeFromType(fieldMap.get(sortName).type, ctx) },
+    ];
+  } else {
+    const fieldName = args.fields[0];
+    return [{ attributeName: fieldName, attributeType: attributeTypeFromType(fieldMap.get(fieldName).type, ctx) }];
+  }
+}
+
+function condenseRangeKey(fields: string[]) {
+  return fields.join(ModelResourceIDs.ModelCompositeKeySeparator());
+}
+
+/**
+ * Return a key schema given @key directive arguments.
+ * @param args The arguments of the @key directive.
+ */
+export function keySchema(args: KeyDirectiveConfiguration): KeySchema[] {
+  if (args.fields.length > 1) {
+    const condensedSortKey = condenseRangeKey(args.fields.slice(1));
+    return [
+      { attributeName: args.fields[0], keyType: 'HASH' },
+      { attributeName: condensedSortKey, keyType: 'RANGE' },
+    ];
+  } else {
+    return [{ attributeName: args.fields[0], keyType: 'HASH' }];
+  }
 }

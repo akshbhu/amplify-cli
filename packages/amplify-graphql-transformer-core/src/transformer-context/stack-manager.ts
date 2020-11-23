@@ -23,6 +23,7 @@ export class StackManager implements StackManagerProvider {
   }
   createStack = (stackName: string): Stack => {
     const newStack = new TransformerNestedStack(this.rootStack, stackName);
+    this.stacks.set(stackName, newStack);
     return newStack;
   };
 
@@ -30,7 +31,7 @@ export class StackManager implements StackManagerProvider {
     const stackName = this.resourceToStackMap.has(resourceId) ? this.resourceToStackMap.get(resourceId) : defaultStackName;
     if (stackName) {
       try {
-        this.getStack(stackName);
+        return this.getStack(stackName);
       } catch (e) {
         return this.createStack(stackName);
       }
