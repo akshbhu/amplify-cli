@@ -1,6 +1,13 @@
-import { CfnTable, Table, GlobalSecondaryIndexProps, AttributeType, ProjectionType, SecondaryIndexProps } from '@aws-cdk/aws-dynamodb';
+import {
+  CfnTable,
+  Table,
+  GlobalSecondaryIndexProps,
+  AttributeType,
+  ProjectionType,
+  LocalSecondaryIndexProps,
+  SecondaryIndexProps,
+} from '@aws-cdk/aws-dynamodb';
 import { IAspect, IConstruct } from '@aws-cdk/core';
-import { KeyDirectiveConfiguration } from '../graphql-key-transformer';
 
 export interface KeySchema {
   attributeName: string;
@@ -19,10 +26,12 @@ export enum IndexType {
 
 export interface TableIndexProps {
   indexType: IndexType;
-  indexProps: SecondaryIndexProps;
+  indexProps: GlobalSecondaryIndexProps | LocalSecondaryIndexProps | SecondaryIndexProps;
 }
 
 export interface TableKeyType {
+  keySchema?: KeySchema[];
+  attributeDefintions?: AttributeDefinition[];
   isPrimary: boolean;
   index?: TableIndexProps;
 }
@@ -33,18 +42,20 @@ export class DynamoDBTable implements IAspect {
   private keySchema: KeySchema[] | undefined;
   private attributeDefinition: AttributeDefinition[] | undefined;
   private tableIndexProps: TableKeyType | undefined;
-  constructor(keySchemaArgs: KeySchema[], attributeDefinitionsArgs: AttributeDefinition[], tableIndexArgs: TableKeyType) {
+  constructor(tableIndexArgs: TableKeyType, keySchemaArgs: KeySchema[], attributeDefinitionsArgs: AttributeDefinition[]) {
     this.keySchema = keySchemaArgs;
     this.attributeDefinition = attributeDefinitionsArgs;
-    this.tableIndexProps = Object.assign(this.tableIndexProps, tableIndexArgs);
+    this.tableIndexProps = tableIndexArgs;
   }
 
   replacePrimaryKey = (node: CfnTable) => {
-    let x1 = 0;
-    for (const x of this.keySchema!) {
-      node.addPropertyOverride(`KeySchema.${x1}.AttributeName`, `${x.attributeName}`);
-      node.addPropertyOverride(`KeySchema.${x1}.KeyType`, `${x.keyType}`);
-      x1++;
+    if (this.isPrimaryKey()) {
+      let x1 = 0;
+      for (const x of this.keySchema!) {
+        node.addPropertyOverride(`KeySchema.${x1}.AttributeName`, `${x.attributeName}`);
+        node.addPropertyOverride(`KeySchema.${x1}.KeyType`, `${x.keyType}`);
+        x1++;
+      }
     }
     let x2 = 0;
     for (const x of this.attributeDefinition!) {
@@ -59,43 +70,36 @@ export class DynamoDBTable implements IAspect {
   };
 
   appendSecondaryIndex = (node: Table) => {
-    // const IndexProperties : SecondaryIndexProps = Object.assign(this.tableIndexProps?.index?.indexProps ,{projectionType: ProjectionType.ALL });
-    //   if (this.tableIndexProps?.index?.indexType === IndexType.LSI) {
-    //       const lsiIndexProps : LocalSec
-    //     // This is an LSI.
-    //     // Add the new secondary index and update the table's attribute definitions.
-    //     node.addLocalSecondaryIndex();
-    //   } else {
-    //     // This is a GSI.
-    //     // Add the new secondary index and update the table's attribute definitions.
-    //     tableResource.Properties.GlobalSecondaryIndexes = append(
-    //       tableResource.Properties.GlobalSecondaryIndexes,
-    //       new GlobalSecondaryIndex({
-    //         ...baseIndexProperties,
-    //         ProvisionedThroughput: Fn.If(ResourceConstants.CONDITIONS.ShouldUsePayPerRequestBilling, Refs.NoValue, {
-    //           ReadCapacityUnits: Fn.Ref(ResourceConstants.PARAMETERS.DynamoDBModelTableReadIOPS),
-    //           WriteCapacityUnits: Fn.Ref(ResourceConstants.PARAMETERS.DynamoDBModelTableWriteIOPS),
-    //         }) as any,
-    //       }),
-    //     );
-    //   }
-    //   const existingAttrDefSet = new Set(tableResource.Properties.AttributeDefinitions.map(ad => ad.AttributeName));
-    //   for (const attr of attrDefs) {
-    //     if (!existingAttrDefSet.has(attr.AttributeName)) {
-    //       tableResource.Properties.AttributeDefinitions.push(attr);
-    //     }
-    //   }
+    if (this.tableIndexProps?.index?.indexType === IndexType.LSI) {
+      const lsiProps: LocalSecondaryIndexProps = {
+        ...this.tableIndexProps.index.indexProps,
+        sortKey: { name: this.attributeDefinition![1].attributeName, type: this.attributeDefinition![1].attributeType as AttributeType },
+        projectionType: ProjectionType.ALL,
+      };
+      node.addLocalSecondaryIndex(lsiProps);
+    } else {
+      // This is a GSI.
+      // Add the new secondary index and update the table's attribute definitions.
+      const gsiProps: GlobalSecondaryIndexProps = {
+        ...this.tableIndexProps!.index!.indexProps,
+        partitionKey: {
+          name: this.attributeDefinition![1].attributeName,
+          type: this.attributeDefinition![1].attributeType as AttributeType,
+        },
+        projectionType: ProjectionType.ALL,
+      };
+      node.addGlobalSecondaryIndex(gsiProps);
+    }
+    // Adding attributes for GSI and LSI
 
-    const props: GSIProps = { partitionKey: { name: 'akshay', type: AttributeType.STRING }, indexName: 'akshay1' };
-    node.addGlobalSecondaryIndex(props);
-    console.log(node);
+    // const props: GSIProps = { partitionKey: { name: 'akshay', type: AttributeType.STRING }, indexName: 'akshay1' };
+    // node.addGlobalSecondaryIndex(props);
+    // console.log(node);
   };
 
   public visit(node: IConstruct): void {
     if (node instanceof CfnTable) {
-      if (this.isPrimaryKey()) {
-        this.replacePrimaryKey(node);
-      }
+      this.replacePrimaryKey(node);
     }
     if (node instanceof Table) {
       if (!this.isPrimaryKey()) {

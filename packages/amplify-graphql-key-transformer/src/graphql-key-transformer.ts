@@ -28,6 +28,8 @@ import {
 } from 'graphql-transformer-common';
 import { Aspects } from '@aws-cdk/core';
 import { DynamoDBTable, TableKeyType, AttributeDefinition, KeySchema, TableIndexProps, IndexType } from './dynamoDbTable/dynamoDbTable';
+import { GlobalSecondaryIndexProps, LocalSecondaryIndexProps, SecondaryIndexProps } from '@aws-cdk/aws-dynamodb';
+
 import {
   DirectiveNode,
   ObjectTypeDefinitionNode,
@@ -199,7 +201,7 @@ export class KeyTransformer extends TransformerModelEnhancerBase implements Tran
       const def = ctx.output.getObject(keyTypeName)!;
       const keyDirectiveConfigArr = this.keyDirectiveConfig.get(keyTypeName)!;
       keyDirectiveConfigArr.forEach(keyDirectiveConfig => {
-        // add / update primary key and GSI
+        // add / update primary key and GSI and update table Attributes
         const tableLogicalName = `${def.name.value}Table`;
         const stack = ctx.stackManager.getStackFor(tableLogicalName, def.name.value);
         const keySchemaArgs = keySchema(keyDirectiveConfig);
@@ -228,7 +230,7 @@ export class KeyTransformer extends TransformerModelEnhancerBase implements Tran
       return { isPrimary: true };
     } else {
       // Return a GSI/LSI Config.
-      return this.appendSecondaryIndex(keyDirectiveArgs, keyTypeName);
+      return this.getSecondaryIndexData(keyDirectiveArgs, keyTypeName);
     }
   };
 
@@ -238,7 +240,7 @@ export class KeyTransformer extends TransformerModelEnhancerBase implements Tran
    * @param directive The @key directive
    * @param ctx The transformer context
    */
-  appendSecondaryIndex = (keyDirectiveArgs: KeyDirectiveConfiguration, keyTypeName: string): TableKeyType => {
+  getSecondaryIndexData = (keyDirectiveArgs: KeyDirectiveConfiguration, keyTypeName: string): TableKeyType => {
     const ks = keySchema(keyDirectiveArgs);
     const primaryKeyDirective = this.keyDirectiveConfig.get(keyTypeName)!.find(element => this.isPrimaryKey(element));
     const primaryPartitionKeyName: string = primaryKeyDirective ? primaryKeyDirective.fields[0] : 'id';
@@ -249,7 +251,9 @@ export class KeyTransformer extends TransformerModelEnhancerBase implements Tran
     if (primaryPartitionKeyName === ks[0].attributeName) {
       // This is an LSI.
       // Add the new secondary index and update the table's attribute definitions.
-      baseIndexProperties.index = Object.assign(baseIndexProperties.index, { indexProps: { indexType: IndexType.LSI } });
+      baseIndexProperties.index!.indexType = IndexType.LSI;
+    } else {
+      baseIndexProperties.index!.indexType = IndexType.GSI;
     }
     return baseIndexProperties;
   };
