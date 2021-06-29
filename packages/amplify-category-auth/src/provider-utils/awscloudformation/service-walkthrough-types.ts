@@ -28,6 +28,7 @@ export interface ServiceQuestionsBaseResult {
   userpoolClientWriteAttributes: string[];
   usernameCaseSensitive?: boolean;
   authTriggerConnections?: string;
+  permissions?: string;
 }
 
 export interface OAuthResult {
