@@ -56,7 +56,7 @@ describe('amplify add auth...', () => {
     expect(clients[0].UserPoolClient.SupportedIdentityProviders).toHaveLength(5);
   });
 
-  it.only('...should init a project and add auth a PostConfirmation: add-to-group trigger', async () => {
+  it('...should init a project and add auth a PostConfirmation: add-to-group trigger', async () => {
     await initJSProjectWithProfile(projRoot, defaultsSettings);
     await addAuthWithGroupTrigger(projRoot, {});
     await amplifyPushAuth(projRoot);
@@ -76,17 +76,6 @@ describe('amplify add auth...', () => {
     expect(clients).toHaveLength(2);
     expect(lambdaFunction).toBeDefined();
     expect(lambdaFunction.Configuration.Environment.Variables.GROUP).toEqual('mygroup');
-    const region = id.split('_')[0];
-    const result1 = await invokeFunction(
-      functionName,
-      JSON.stringify({
-        userPoolId: id,
-        userName: 'testUser',
-      }),
-      region,
-    );
-    expect(result1.StatusCode).toBe(200);
-    expect(result1.Payload).toBeDefined();
   });
 
   it('...should allow the user to add auth via API category, with a trigger', async () => {

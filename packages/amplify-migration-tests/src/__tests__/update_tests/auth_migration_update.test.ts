@@ -11,7 +11,6 @@ import {
   getUserPoolClients,
   updateAuthWithoutCustomTrigger,
   updateAuthWithoutTrigger,
-  addAuthWithGroupTrigger,
 } from 'amplify-e2e-core';
 import * as fs from 'fs-extra';
 import { join } from 'path';

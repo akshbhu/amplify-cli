@@ -194,6 +194,7 @@ export async function updateFunctionResource(
 
       if ('trigger' in previousParameters) {
         parameters = _.assign({}, previousParameters, parameters);
+
         if (parameters.triggerEnvs && parameters.triggerEnvs instanceof String) {
           parameters.triggerEnvs = JSONUtilities.parse(parameters.triggerEnvs) || [];
         }
