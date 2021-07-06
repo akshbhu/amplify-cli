@@ -35,7 +35,6 @@ export const addTrigger = async triggerOptions => {
     functionName,
     triggerEnvs = '[]',
     category,
-    categoryPolicies,
     parentStack,
     targetPath,
     parentResource,
@@ -53,7 +52,6 @@ export const addTrigger = async triggerOptions => {
     FunctionServiceNameLambdaFunction,
     {
       trigger: true,
-      categoryPolicies,
       cloudResourceTemplatePath: path.join(triggerDir, 'cloudformation-templates', triggerTemplate),
       functionTemplate: {
         sourceRoot: path.join(triggerDir, 'function-template-dir'),
@@ -113,7 +111,6 @@ export const updateTrigger = async triggerOptions => {
     key,
     values,
     context,
-    categoryPolicies,
     functionName,
     triggerEnvs = '[]',
     category,
@@ -135,7 +132,6 @@ export const updateTrigger = async triggerOptions => {
       FunctionServiceNameLambdaFunction,
       {
         trigger: true,
-        categoryPolicies,
         modules: values,
         parentResource,
         functionName,

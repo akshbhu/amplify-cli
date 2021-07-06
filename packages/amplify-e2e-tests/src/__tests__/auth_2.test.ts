@@ -56,7 +56,7 @@ describe('amplify add auth...', () => {
     expect(clients[0].UserPoolClient.SupportedIdentityProviders).toHaveLength(5);
   });
 
-  it('...should init a project and add auth a PostConfirmation: add-to-group trigger', async () => {
+  it.only('...should init a project and add auth a PostConfirmation: add-to-group trigger', async () => {
     await initJSProjectWithProfile(projRoot, defaultsSettings);
     await addAuthWithGroupTrigger(projRoot, {});
     await amplifyPushAuth(projRoot);
@@ -80,7 +80,7 @@ describe('amplify add auth...', () => {
     const result1 = await invokeFunction(
       functionName,
       JSON.stringify({
-        userPoolId: 'id',
+        userPoolId: id,
         userName: 'testUser',
       }),
       region,
